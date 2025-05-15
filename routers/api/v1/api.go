@@ -1711,6 +1711,7 @@ func Routes() *web.Router {
 					m.Get("/badges", admin.ListUserBadges)
 					m.Post("/badges", bind(api.UserBadgeOption{}), admin.AddUserBadges)
 					m.Delete("/badges", bind(api.UserBadgeOption{}), admin.DeleteUserBadges)
+					m.Post("/authsrcldap", bind(api.LDAPAuth{}), admin.CreateLDAPAuthSource)
 				}, context.UserAssignmentAPI())
 			})
 			m.Group("/emails", func() {
