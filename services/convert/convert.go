@@ -14,6 +14,7 @@ import (
 	actions_model "code.gitea.io/gitea/models/actions"
 	asymkey_model "code.gitea.io/gitea/models/asymkey"
 	"code.gitea.io/gitea/models/auth"
+
 	git_model "code.gitea.io/gitea/models/git"
 	issues_model "code.gitea.io/gitea/models/issues"
 	"code.gitea.io/gitea/models/organization"
@@ -573,4 +574,13 @@ func ToChangedFile(f *gitdiff.DiffFile, repo *repo_model.Repository, commit stri
 	}
 
 	return file
+}
+
+func ToLdapAuth(source *auth.Source) *api.LDAPAuth {
+
+	return &api.LDAPAuth{
+		ID:       source.ID,
+		Name:     source.Name,
+		IsActive: source.IsActive,
+	}
 }

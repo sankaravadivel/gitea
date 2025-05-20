@@ -3,6 +3,8 @@
 
 package ldap
 
+import "strings"
+
 // composeFullName composes a firstname surname or username
 func composeFullName(firstname, surname, username string) string {
 	switch {
@@ -15,4 +17,13 @@ func composeFullName(firstname, surname, username string) string {
 	default:
 		return firstname + " " + surname
 	}
+}
+
+func FindLdapSecurityProtocolByName(name string) (SecurityProtocol, bool) {
+	for i, n := range SecurityProtocolNames {
+		if strings.EqualFold(name, n) {
+			return i, true
+		}
+	}
+	return 0, false
 }
