@@ -45,6 +45,7 @@ func UpdateLDAPAuthSource(ctx *context.APIContext) {
 	form.ID = ctx.PathParamInt64("id")
 	ctx.Data["Title"] = ctx.Tr("admin.auths.new")
 	authSource := &auth.Source{
+		ID:       form.ID,
 		Type:     auth.LDAP,
 		IsActive: true, // active by default
 		Cfg: &ldap.Source{
@@ -82,7 +83,6 @@ func parseAuthSourceConfig(form *api.LDAPAuth, authSource *auth.Source) {
 
 // parseLdapConfig assigns values on config according to command line flags.
 func parseLdapConfig(form *api.LDAPAuth, config *ldap.Source) error {
-
 	config.Name = form.Name
 	config.Host = form.Host
 	config.Port = form.Port
