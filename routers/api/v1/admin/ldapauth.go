@@ -14,6 +14,30 @@ import (
 )
 
 func CreateLDAPAuthSource(ctx *context.APIContext) {
+	// swagger:operation POST /admin/auth/ldap admin adminCreateLdapAuthSource
+	// ---
+	// summary: Create a LDAP Authentication Source
+	// consumes:
+	// - application/json
+	// produces:
+	// - application/json
+	// parameters:
+	// - name: username
+	//   in: path
+	//   description: username of the user that will own the created organization
+	//   type: string
+	//   required: true
+	// - name: organization
+	//   in: body
+	//   required: true
+	//   schema: { "$ref": "#/definitions/CreateOrgOption" }
+	// responses:
+	//   "201":
+	//     "$ref": "#/responses/Organization"
+	//   "403":
+	//     "$ref": "#/responses/forbidden"
+	//   "422":
+	//     "$ref": "#/responses/validationError"
 
 	form := web.GetForm(ctx).(*api.LDAPAuth)
 	ctx.Data["Title"] = ctx.Tr("admin.auths.new")
@@ -67,6 +91,18 @@ func UpdateLDAPAuthSource(ctx *context.APIContext) {
 	ctx.JSON(http.StatusOK, convert.ToLdapAuth(authSource))
 }
 
+func GetLDAPAuthSource(ctx *context.APIContext) {
+	id := ctx.PathParamInt64("id")
+	source, err := auth.GetSourceByID(ctx, id)
+	if err != nil {
+		if auth.IsErrSourceNotExist(err) {
+			ctx.APIError(http.StatusUnprocessableEntity, err)
+		}
+		ctx.APIErrorInternal(err)
+	}
+	ctx.JSON(http.StatusOK, convert.ToLdapAuth(source))
+}
+
 func parseAuthSourceConfig(form *api.LDAPAuth, authSource *auth.Source) {
 
 	if form.Name != "" {
@@ -90,7 +126,7 @@ func parseLdapConfig(form *api.LDAPAuth, config *ldap.Source) error {
 	if form.SecurityProtocol != "" {
 		p, ok := ldap.FindLdapSecurityProtocolByName(form.SecurityProtocol)
 		if !ok {
-			return fmt.Errorf("Unknown security protocol name: %s", form.SecurityProtocol)
+			return fmt.Errorf("unknown security protocol name: %s", form.SecurityProtocol)
 		}
 		config.SecurityProtocol = p
 	}

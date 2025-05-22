@@ -1694,6 +1694,9 @@ func Routes() *web.Router {
 				m.Post("/{task}", admin.PostCronTask)
 			})
 			m.Get("/orgs", admin.GetAllOrgs)
+			m.Post("/auth/ldap", bind(api.LDAPAuth{}), admin.CreateLDAPAuthSource)
+			m.Combo("/auth/ldap/{id}").Get(admin.GetLDAPAuthSource).
+				Patch(bind(api.LDAPAuth{}), admin.UpdateLDAPAuthSource)
 			m.Group("/users", func() {
 				m.Get("", admin.SearchUsers)
 				m.Post("", bind(api.CreateUserOption{}), admin.CreateUser)
@@ -1711,8 +1714,6 @@ func Routes() *web.Router {
 					m.Get("/badges", admin.ListUserBadges)
 					m.Post("/badges", bind(api.UserBadgeOption{}), admin.AddUserBadges)
 					m.Delete("/badges", bind(api.UserBadgeOption{}), admin.DeleteUserBadges)
-					m.Post("/auth/ldap", bind(api.LDAPAuth{}), admin.CreateLDAPAuthSource)
-					m.Patch("/auth/ldap/{id}", bind(api.LDAPAuth{}), admin.UpdateLDAPAuthSource)
 				}, context.UserAssignmentAPI())
 			})
 			m.Group("/emails", func() {
