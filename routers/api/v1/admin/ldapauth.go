@@ -10,34 +10,35 @@ import (
 	"code.gitea.io/gitea/modules/web"
 	"code.gitea.io/gitea/services/auth/source/ldap"
 	"code.gitea.io/gitea/services/context"
-	"code.gitea.io/gitea/services/convert"
 )
 
 func CreateLDAPAuthSource(ctx *context.APIContext) {
 	// swagger:operation POST /admin/auth/ldap admin adminCreateLdapAuthSource
 	// ---
-	// summary: Create a LDAP Authentication Source
+	// summary: Create a new LDAP Authentication Source
+	// description: Creates a new LDAP authentication source with the provided configuration.
 	// consumes:
 	// - application/json
 	// produces:
 	// - application/json
 	// parameters:
-	// - name: username
-	//   in: path
-	//   description: username of the user that will own the created organization
-	//   type: string
-	//   required: true
-	// - name: organization
+	// - name: ldap_auth
 	//   in: body
+	//   description: The LDAP authentication source configuration to create
 	//   required: true
-	//   schema: { "$ref": "#/definitions/CreateOrgOption" }
+	//   schema:
+	//     $ref: "#/definitions/LDAPAuth"
 	// responses:
 	//   "201":
-	//     "$ref": "#/responses/Organization"
-	//   "403":
-	//     "$ref": "#/responses/forbidden"
+	//     description: LDAP authentication source created successfully
+	//     schema:
+	//       $ref: "#/definitions/LDAPAuth"
+	//   "400":
+	//     description: Invalid request or validation error
 	//   "422":
-	//     "$ref": "#/responses/validationError"
+	//     description: LDAP authentication source already exists or unprocessable entity
+	//   "500":
+	//     description: Internal server error
 
 	form := web.GetForm(ctx).(*api.LDAPAuth)
 	ctx.Data["Title"] = ctx.Tr("admin.auths.new")
@@ -61,10 +62,47 @@ func CreateLDAPAuthSource(ctx *context.APIContext) {
 		}
 		ctx.APIErrorInternal(err)
 	}
-	ctx.JSON(http.StatusCreated, convert.ToLdapAuth(authSource))
+	form.ID = authSource.ID
+	a, err := toLdapAuth(authSource)
+	if err != nil {
+		ctx.APIError(http.StatusInternalServerError, err)
+	}
+	ctx.JSON(http.StatusCreated, a)
 }
 
 func UpdateLDAPAuthSource(ctx *context.APIContext) {
+	// swagger:operation PATCH /admin/auth/ldap/{id} admin adminUpdateLdapAuthSource
+	// ---
+	// summary: Update an LDAP Authentication Source
+	// description: Updates the configuration of an existing LDAP authentication source by its ID.
+	// consumes:
+	// - application/json
+	// produces:
+	// - application/json
+	// parameters:
+	// - name: id
+	//   in: path
+	//   description: ID of the LDAP Authentication Source to update
+	//   required: true
+	//   type: integer
+	// - name: ldap_auth
+	//   in: body
+	//   description: The updated LDAP authentication source configuration
+	//   required: true
+	//   schema:
+	//     $ref: "#/definitions/LDAPAuth"
+	// responses:
+	//   "200":
+	//     description: LDAP authentication source updated successfully
+	//     schema:
+	//       $ref: "#/definitions/LDAPAuth"
+	//   "400":
+	//     description: Invalid request or validation error
+	//   "404":
+	//     description: LDAP authentication source not found
+	//   "500":
+	//     description: Internal server error
+
 	form := web.GetForm(ctx).(*api.LDAPAuth)
 	form.ID = ctx.PathParamInt64("id")
 	ctx.Data["Title"] = ctx.Tr("admin.auths.new")
@@ -88,7 +126,11 @@ func UpdateLDAPAuthSource(ctx *context.APIContext) {
 		}
 		ctx.APIErrorInternal(err)
 	}
-	ctx.JSON(http.StatusOK, convert.ToLdapAuth(authSource))
+	a, err := toLdapAuth(authSource)
+	if err != nil {
+		ctx.APIError(http.StatusInternalServerError, err)
+	}
+	ctx.JSON(http.StatusOK, a)
 }
 
 func GetLDAPAuthSource(ctx *context.APIContext) {
@@ -100,7 +142,11 @@ func GetLDAPAuthSource(ctx *context.APIContext) {
 		}
 		ctx.APIErrorInternal(err)
 	}
-	ctx.JSON(http.StatusOK, convert.ToLdapAuth(source))
+	a, err := toLdapAuth(source)
+	if err != nil {
+		ctx.APIError(http.StatusInternalServerError, err)
+	}
+	ctx.JSON(http.StatusOK, a)
 }
 
 func parseAuthSourceConfig(form *api.LDAPAuth, authSource *auth.Source) {
@@ -155,4 +201,42 @@ func parseLdapConfig(form *api.LDAPAuth, config *ldap.Source) error {
 	config.GroupTeamMap = form.BindConfig.GroupTeamMap
 	config.GroupTeamMapRemoval = form.BindConfig.GroupTeamMapRemoval
 	return nil
+}
+
+func toLdapAuth(source *auth.Source) (*api.LDAPAuth, error) {
+	ldapSource, ok := source.Cfg.(*ldap.Source)
+	if !ok {
+		return nil, fmt.Errorf("source config is not ldap")
+	}
+	form := &api.LDAPAuth{
+		ID:                    source.ID,
+		Name:                  source.Name,
+		IsActive:              source.IsActive,
+		UserSearchBase:        ldapSource.UserBase,
+		UserNameAttribute:     ldapSource.AttributeUsername,
+		FirstNameAttribute:    ldapSource.AttributeName,
+		SurnameAttribute:      ldapSource.AttributeSurname,
+		EmailAttribute:        ldapSource.AttributeMail,
+		PublicSSHKeyAttribute: ldapSource.AttributeSSHPublicKey,
+		AvatarAttribute:       ldapSource.AttributeAvatar,
+		UserFilter:            ldapSource.Filter,
+		SecurityProtocol:      ldapSource.SecurityProtocolName(),
+		BindConfig: api.LDAPBind{
+			GroupSearchDN:        ldapSource.GroupDN,
+			GroupMemberAttribute: ldapSource.GroupMemberUID,
+			GroupUserAttribute:   ldapSource.UserUID,
+			GroupFilter:          ldapSource.GroupFilter,
+			GroupTeamMap:         ldapSource.GroupTeamMap,
+			GroupTeamMapRemoval:  ldapSource.GroupTeamMapRemoval,
+			BindDN:               ldapSource.BindDN,
+			BindPassword:         ldapSource.BindPassword,
+			UserDN:               ldapSource.UserDN,
+			AttributesInBind:     ldapSource.AttributesInBind,
+			SyncUsers:            source.IsSyncEnabled,
+			DisableSyncUsers:     !source.IsSyncEnabled,
+			PageSize:             int(ldapSource.SearchPageSize),
+			EnableGroups:         ldapSource.GroupsEnabled,
+		},
+	}
+	return form, nil
 }
