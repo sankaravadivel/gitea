@@ -11,6 +11,7 @@ import (
 	actions_model "code.gitea.io/gitea/models/actions"
 	"code.gitea.io/gitea/models/db"
 	secret_model "code.gitea.io/gitea/models/secret"
+	"code.gitea.io/gitea/modules/setting"
 	notify_service "code.gitea.io/gitea/services/notify"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
@@ -112,7 +113,10 @@ func generateTaskContext(t *actions_model.ActionTask) (*structpb.Struct, error) 
 	gitCtx := GenerateGiteaContext(t.Job.Run, t.Job)
 	gitCtx["token"] = t.Token
 	gitCtx["gitea_runtime_token"] = giteaRuntimeToken
-
+	if setting.OIDC.EnableOIDC {
+		gitCtx["actions_id_token_request_token"] = giteaRuntimeToken
+		gitCtx["actions_id_token_request_url"] = setting.OIDC.ActionsIDTokenRequestURL
+	}
 	return structpb.NewStruct(gitCtx)
 }
 
