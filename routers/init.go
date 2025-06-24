@@ -32,6 +32,7 @@ import (
 	packages_router "code.gitea.io/gitea/routers/api/packages"
 	apiv1 "code.gitea.io/gitea/routers/api/v1"
 	"code.gitea.io/gitea/routers/common"
+	oidc_routers "code.gitea.io/gitea/routers/oidc"
 	"code.gitea.io/gitea/routers/private"
 	web_routers "code.gitea.io/gitea/routers/web"
 	actions_service "code.gitea.io/gitea/services/actions"
@@ -185,6 +186,7 @@ func NormalRoutes() *web.Router {
 	r := web.NewRouter()
 	r.Use(common.ProtocolMiddlewares()...)
 
+	r.Mount("/oidc", oidc_routers.Routes())
 	r.Mount("/", web_routers.Routes())
 	r.Mount("/api/v1", apiv1.Routes())
 	r.Mount("/api/internal", private.Routes())

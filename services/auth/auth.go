@@ -55,6 +55,11 @@ func newAuthPathDetector(req *http.Request) *authPathDetector {
 	return &authPathDetector{req: req, vars: globalVars()}
 }
 
+// isOIDCPath returns true if the specified URL is an API path
+func (a *authPathDetector) isOIDCPath() bool {
+	return strings.HasPrefix(a.req.URL.Path, "/oidc/")
+}
+
 // isAPIPath returns true if the specified URL is an API path
 func (a *authPathDetector) isAPIPath() bool {
 	return strings.HasPrefix(a.req.URL.Path, "/api/")
