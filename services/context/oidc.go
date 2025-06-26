@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"code.gitea.io/gitea/models/actions"
 	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/cache"
 	"code.gitea.io/gitea/modules/log"
@@ -22,13 +23,7 @@ type OIDCContext struct {
 	IsBasicAuth bool
 
 	ContextUser *user_model.User // the user which is being visited, in most cases it differs from Doer
-
-	Repo          *Repository
-	Org           *APIOrganization
-	Package       *Package
-	PublicOnly    bool   // Whether the request is for a public endpoint
-	IDToken       string // The ID Token for the OIDC request
-	ISOIDCEnabled bool   // Whether the request is for a public endpoint
+	ActionsTask *actions.ActionTask
 }
 
 type OIDCAuthError struct {
