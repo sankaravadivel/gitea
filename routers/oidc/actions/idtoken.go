@@ -6,6 +6,9 @@ import (
 	"os"
 	"time"
 
+	"code.gitea.io/gitea/models/actions"
+	"code.gitea.io/gitea/models/repo"
+	"code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/services/context"
 	"github.com/golang-jwt/jwt/v4"
 
@@ -55,6 +58,8 @@ type OIDCClaims struct {
 	RepositoryOwnerID int64  `json:"repository_owner_id"`
 	RunID             int64  `json:"run_id"`
 	EventName         string `json:"event_name"`
+	ActorID           int64  `json:"actor_id"`
+	Actor             string `json:"actor"`
 }
 
 func GetIDToken(ctx *context.OIDCContext) {
@@ -80,19 +85,41 @@ func createToken(ctx *context.OIDCContext) (string, error) {
 		return "", fmt.Errorf("invalid jwt signing key file - %w", err)
 	}
 
+	repo, err := repo.GetRepositoryByID(ctx, ctx.ActionsTask.RepoID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get the repo attached to run - %w", err)
+	}
+
+	job, err := actions.GetRunJobByID(ctx, ctx.ActionsTask.JobID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get the job details - %w", err)
+	}
+
+	run, err := actions.GetRunByID(ctx, job.RunID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get run details - %w", err)
+	}
+
+	triggerUser, err := user.GetUserByID(ctx, run.TriggerUserID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get actor details - %w", err)
+	}
+
 	t.Claims = &OIDCClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
 		},
-		Subject:           fmt.Sprintf("repo:%s", ctx.ActionsTask.GetRepoName()),
-		Repository:        ctx.ActionsTask.Job.Repo.Name,
-		RepositoryOwner:   ctx.ActionsTask.Job.Repo.OwnerName,
-		RepositoryID:      ctx.ActionsTask.Job.RepoID,
-		RepositoryOwnerID: ctx.ActionsTask.Job.Repo.OwnerID,
-		RunID:             ctx.ActionsTask.Job.RunID,
-		EventName:         ctx.ActionsTask.Job.Run.Event.Event(),
+		Subject:           fmt.Sprintf("repo:%s/%s", repo.OwnerName, repo.Name),
+		Repository:        repo.Name,
+		RepositoryOwner:   repo.OwnerName,
+		RepositoryID:      repo.ID,
+		RepositoryOwnerID: repo.OwnerID,
+		RunID:             job.RunID,
+		ActorID:           run.TriggerUserID,
+		Actor:             triggerUser.Name,
+		//EventName:         run.E,
 	}
 
 	// Creat token string

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	actions_model "code.gitea.io/gitea/models/actions"
+	"code.gitea.io/gitea/services/actions"
 )
 
 type OIDCActionsAuth struct{}
@@ -22,11 +23,14 @@ func (oidc *OIDCActionsAuth) Verify(req *http.Request, w http.ResponseWriter, st
 	if !ok {
 		return nil, fmt.Errorf("no actions-id-token-request-token found in the auth header")
 	}
-	task, err := actions_model.GetRunningTaskByToken(req.Context(), token)
-	if err != nil || task == nil {
+	taskID, err := actions.TokenToTaskID(token)
+	if err != nil || taskID == 0 {
 		return nil, fmt.Errorf("actions-id-token-request-token did not contain a valid task")
 	}
-
+	task, err := actions_model.GetTaskByID(req.Context(), taskID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get task by ID %d: %w", taskID, err)
+	}
 	return task, nil
 }
 
