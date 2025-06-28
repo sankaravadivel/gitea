@@ -1,7 +1,9 @@
 package actions
 
 import (
+	"encoding/base64"
 	"fmt"
+	"math/big"
 	"net/http"
 	"os"
 	"time"
@@ -62,6 +64,19 @@ type OIDCClaims struct {
 	Actor             string `json:"actor"`
 }
 
+type JWKSKey struct {
+	KeyType   string `json:"kty"`
+	Use       string `json:"use"`
+	Modulus   string `json:"n"`
+	Exponent  string `json:"e"`
+	KID       string `json:"kid"`
+	Algorithm string `json:"alg"`
+}
+
+type JWKSResp struct {
+	Keys []JWKSKey `json:"keys"`
+}
+
 func GetIDToken(ctx *context.OIDCContext) {
 	t, err := createToken(ctx)
 	if err != nil {
@@ -73,6 +88,44 @@ func GetIDToken(ctx *context.OIDCContext) {
 	ctx.JSON(http.StatusCreated, idt)
 }
 
+func JWKS(ctx *context.OIDCContext) {
+	privateKeyBytes, err := os.ReadFile(setting.OIDC.OIDCJWTPrivateKeyPath)
+	if err != nil {
+		ctx.OIDCError(http.StatusInternalServerError, fmt.Errorf("failed to read jwt verify key - %w", err))
+	}
+
+	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
+	if err != nil {
+		ctx.OIDCError(http.StatusInternalServerError, fmt.Errorf("failed to parse jwt key - %w", err))
+	}
+
+	verifyKey := privateKey.PublicKey
+	modulus := verifyKey.N
+
+	// Convert the modulus to a byte slice
+	modulusBytes := modulus.Bytes()
+
+	// Encode the modulus bytes to Base64
+	modulusBase64 := base64.StdEncoding.EncodeToString(modulusBytes)
+	bigIntExponent := big.NewInt(int64(verifyKey.E))
+	exponentBytes := bigIntExponent.Bytes()
+
+	// Base64url encode the exponent bytes
+	base64urlEncodedExponent := base64.RawURLEncoding.EncodeToString(exponentBytes)
+	jwksr := JWKSResp{
+		Keys: []JWKSKey{
+			{
+				KeyType:   "RSA",
+				KID:       base64.StdEncoding.EncodeToString([]byte(setting.OIDC.OIDCJWTPubKeyPath)),
+				Modulus:   modulusBase64,
+				Exponent:  base64urlEncodedExponent,
+				Algorithm: "RS256",
+				Use:       "sig",
+			},
+		},
+	}
+	ctx.JSON(http.StatusAccepted, jwksr)
+}
 func createToken(ctx *context.OIDCContext) (string, error) {
 	// create a signer for rsa 256
 	t := jwt.New(jwt.GetSigningMethod("RS256"))
