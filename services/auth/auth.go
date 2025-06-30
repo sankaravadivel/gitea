@@ -60,8 +60,8 @@ func (a *authPathDetector) isOIDCPath() bool {
 	return strings.HasPrefix(a.req.URL.Path, "/oidc/")
 }
 
-func (a *authPathDetector) isOIDCJWKSPath() bool {
-	return strings.HasPrefix(a.req.URL.Path, "/oidc/jwks")
+func (a *authPathDetector) isOIDCWellKnownPath() bool {
+	return strings.HasPrefix(a.req.URL.Path, "/oidc/.well-known")
 }
 
 // isAPIPath returns true if the specified URL is an API path

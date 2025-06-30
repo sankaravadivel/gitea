@@ -65,12 +65,14 @@ type OIDCClaims struct {
 }
 
 type JWKSKey struct {
-	KeyType   string `json:"kty"`
-	Use       string `json:"use"`
-	Modulus   string `json:"n"`
-	Exponent  string `json:"e"`
-	KID       string `json:"kid"`
-	Algorithm string `json:"alg"`
+	KeyType               string   `json:"kty"`
+	Use                   string   `json:"use"`
+	Modulus               string   `json:"n"`
+	Exponent              string   `json:"e"`
+	KID                   string   `json:"kid"`
+	Algorithm             string   `json:"alg"`
+	CertificateChain      []string `json:"x5c"`
+	CertificateThumbprint string   `json:"x5t"`
 }
 
 type JWKSResp struct {
@@ -85,7 +87,7 @@ func GetIDToken(ctx *context.OIDCContext) {
 	idt := structs.IDToken{
 		Token: t,
 	}
-	ctx.JSON(http.StatusCreated, idt)
+	ctx.JSON(http.StatusOK, idt)
 }
 
 func JWKS(ctx *context.OIDCContext) {
@@ -101,22 +103,16 @@ func JWKS(ctx *context.OIDCContext) {
 
 	verifyKey := privateKey.PublicKey
 	modulus := verifyKey.N
-
-	// Convert the modulus to a byte slice
 	modulusBytes := modulus.Bytes()
-
-	// Encode the modulus bytes to Base64
-	modulusBase64 := base64.StdEncoding.EncodeToString(modulusBytes)
+	modulusBase64 := base64.RawURLEncoding.EncodeToString(modulusBytes)
 	bigIntExponent := big.NewInt(int64(verifyKey.E))
 	exponentBytes := bigIntExponent.Bytes()
-
-	// Base64url encode the exponent bytes
 	base64urlEncodedExponent := base64.RawURLEncoding.EncodeToString(exponentBytes)
 	jwksr := JWKSResp{
 		Keys: []JWKSKey{
 			{
 				KeyType:   "RSA",
-				KID:       base64.StdEncoding.EncodeToString([]byte(setting.OIDC.OIDCJWTPubKeyPath)),
+				KID:       "cc413527-173f-5a05-976e-9c52b1d7b431",
 				Modulus:   modulusBase64,
 				Exponent:  base64urlEncodedExponent,
 				Algorithm: "RS256",
@@ -124,7 +120,7 @@ func JWKS(ctx *context.OIDCContext) {
 			},
 		},
 	}
-	ctx.JSON(http.StatusAccepted, jwksr)
+	ctx.JSON(http.StatusOK, jwksr)
 }
 func createToken(ctx *context.OIDCContext) (string, error) {
 	// create a signer for rsa 256

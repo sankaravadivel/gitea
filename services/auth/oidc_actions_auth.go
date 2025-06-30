@@ -12,7 +12,7 @@ type OIDCActionsAuth struct{}
 
 func (oidc *OIDCActionsAuth) Verify(req *http.Request, w http.ResponseWriter, store DataStore, sess SessionStore) (*actions_model.ActionTask, error) {
 	detector := newAuthPathDetector(req)
-	if detector.isOIDCJWKSPath() {
+	if detector.isOIDCWellKnownPath() {
 		return nil, nil
 	}
 	oa2 := OAuth2{}
