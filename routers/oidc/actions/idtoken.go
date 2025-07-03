@@ -23,6 +23,8 @@ import (
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/setting"
 	"code.gitea.io/gitea/modules/structs"
+
+	"github.com/djherbis/times"
 )
 
 type OIDCClaims struct {
@@ -77,12 +79,11 @@ func JWKS(ctx *context.OIDCContext) {
 				log.Warn("failed to parse file %s - %v. Skipping...", e.Name(), err)
 				continue
 			}
-			i, err := e.Info()
 			if err != nil {
 				log.Warn("failed to get fileinfo %s - %v. Skipping...", e.Name(), err)
 				continue
 			}
-			key, err := privateKeytoJWKSKey(privateKey, i)
+			key, err := privateKeytoJWKSKey(privateKey)
 			if err != nil {
 				log.Warn("failed to generate JWSK object for file %s - %v. Skipping...", e.Name(), err)
 				continue
@@ -99,13 +100,8 @@ func JWKS(ctx *context.OIDCContext) {
 	})
 }
 func createToken(ctx *context.OIDCContext) (string, error) {
-	// create a signer for rsa 256
-	t := jwt.New(jwt.GetSigningMethod("RS256"))
-	signBytes, err := os.ReadFile(setting.OIDC.OIDCJWTPrivateKeyPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read jwt signing key - %w", err)
-	}
-	signKey, err := jwt.ParseRSAPrivateKeyFromPEM(signBytes)
+
+	signKey, err := getLatestPrivateKey(setting.OIDC.KeysFolderPath)
 	if err != nil {
 		return "", fmt.Errorf("invalid jwt signing key file - %w", err)
 	}
@@ -130,6 +126,9 @@ func createToken(ctx *context.OIDCContext) (string, error) {
 		return "", fmt.Errorf("failed to get actor details - %w", err)
 	}
 
+	// create a signer for rsa 256
+	t := jwt.New(jwt.GetSigningMethod("RS256"))
+
 	t.Claims = &OIDCClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -147,12 +146,15 @@ func createToken(ctx *context.OIDCContext) (string, error) {
 		//EventName:         run.E,
 	}
 
-	// Creat token string
+	// Create token string
 	return t.SignedString(signKey)
 }
 
-func getLatestPrivateKey() (*rsa.PrivateKey, error) {
-	entries, err := os.ReadDir(setting.OIDC.KeysFolderPath)
+// Always use the latest private key to sign the JWT token allowing for rotation of older keys
+// This function gets the newest key based on last modified time which is not ideal. Wish the private keys
+// has the creation time included in it
+func getLatestPrivateKey(path string) (*rsa.PrivateKey, error) {
+	entries, err := os.ReadDir(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signing keys from the keys folder - %w", err)
 	}
@@ -167,13 +169,26 @@ func getLatestPrivateKey() (*rsa.PrivateKey, error) {
 				log.Warn("failed to get file info for %s: %v\n", entry.Name(), err)
 				continue
 			}
-			pk, err := parseRSAPrivateKeyFromFile(filepath.Join(setting.OIDC.KeysFolderPath, entry.Name()))
+			keyPath := filepath.Join(setting.OIDC.KeysFolderPath, entry.Name())
+			pk, err := parseRSAPrivateKeyFromFile(keyPath)
 			if err != nil {
 				log.Warn("not a private key %s: %v\n", entry.Name(), err)
 				continue
 			}
-			if newestFile == nil || info.ModTime().After(newestTime) {
-				newestTime = info.ModTime()
+			birthTime := info.ModTime()
+			t, err := times.Stat(keyPath)
+			if err != nil {
+				log.Warn("failed to get file time. Using FileInfo.ModTime - %v", err)
+			} else {
+				if t.HasBirthTime() {
+					birthTime = t.BirthTime()
+				} else {
+					log.Warn("couldn't get the creation time of file %s. Using FileInfo.ModTime - %v", keyPath, err)
+				}
+			}
+
+			if newestFile == nil || birthTime.After(newestTime) {
+				newestTime = birthTime
 				newestFile = info
 				privateKey = pk
 			}
@@ -182,6 +197,7 @@ func getLatestPrivateKey() (*rsa.PrivateKey, error) {
 	if privateKey == nil {
 		return nil, fmt.Errorf("no signing key found")
 	}
+	log.Debug("The newest signing key is %s", newestFile.Name())
 	return privateKey, nil
 }
 
@@ -198,7 +214,7 @@ func parseRSAPrivateKeyFromFile(path string) (*rsa.PrivateKey, error) {
 	return privateKey, nil
 }
 
-func privateKeytoJWKSKey(privateKey *rsa.PrivateKey, info fs.FileInfo) (*JWKSKey, error) {
+func privateKeytoJWKSKey(privateKey *rsa.PrivateKey) (*JWKSKey, error) {
 	verifyKey := privateKey.PublicKey
 	modulus := verifyKey.N
 	modulusBytes := modulus.Bytes()
@@ -219,8 +235,12 @@ func privateKeytoJWKSKey(privateKey *rsa.PrivateKey, info fs.FileInfo) (*JWKSKey
 		Use:       "sig",
 	}, nil
 }
+
+// kid is used to identify the specific public key within the JWKS that should be used
+// to verify the token's signature.This allows for key rotation and multiple signing keys
+// without requiring clients to download and store all possible public keys.
 func generateKid(publicKey *rsa.PublicKey) (string, error) {
-	// Marshal the public key to PKIX (SPKI) format
+	// Marshal the public key to PKCS #1 format
 	pubASN1 := x509.MarshalPKCS1PublicKey(publicKey)
 
 	// Calculate SHA256 hash of the marshaled public key
