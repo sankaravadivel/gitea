@@ -5,6 +5,7 @@ var OIDC = struct {
 	OIDCJWTPubKeyPath        string
 	OIDCJWTPrivateKeyPath    string
 	ActionsIDTokenRequestURL string
+	KeysFolderPath           string
 }{}
 
 func LoadOIDCSetting() {
@@ -16,4 +17,5 @@ func loadOIDCSetting(rootCfg ConfigProvider) {
 	OIDC.EnableOIDC = sec.Key("ENABLE_OIDC").MustBool(false)
 	OIDC.ActionsIDTokenRequestURL = sec.Key("ACTIONS_ID_TOKEN_REQUEST_URL").String()
 	OIDC.OIDCJWTPrivateKeyPath = sec.Key("JWT_PRIVATE_KEY_PATH").String()
+	OIDC.KeysFolderPath = sec.Key("KEYS_FOLDER_PATH").String()
 }
