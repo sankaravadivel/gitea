@@ -20,7 +20,7 @@ func (oidc *OIDCActionsAuth) Verify(req *http.Request, w http.ResponseWriter, st
 	if err != nil {
 		return nil, err
 	}
-	if u.ID != -2 {
+	if u == nil || u.ID != -2 {
 		return nil, fmt.Errorf("the provided actions-id-token-request-token is not valid")
 	}
 	token, ok := parseToken(req)
