@@ -14,6 +14,7 @@ func Routes() *web.Router {
 	m.Use(context.OIDCContexter())
 	m.Use(oidcAuth())
 	m.Get("/id-token", actions.GetIDToken)
+	m.Get("/id", actions.GetIDToken)
 	m.Get("/.well-known/jwks", actions.JWKS)
 	return m
 }
