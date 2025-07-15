@@ -79,10 +79,6 @@ func JWKS(ctx *context.OIDCContext) {
 				log.Warn("failed to parse file %s - %v. Skipping...", e.Name(), err)
 				continue
 			}
-			if err != nil {
-				log.Warn("failed to get fileinfo %s - %v. Skipping...", e.Name(), err)
-				continue
-			}
 			key, err := privateKeytoJWKSKey(privateKey)
 			if err != nil {
 				log.Warn("failed to generate JWSK object for file %s - %v. Skipping...", e.Name(), err)
@@ -129,12 +125,17 @@ func createToken(ctx *context.OIDCContext) (string, error) {
 	// create a signer for rsa 256
 	t := jwt.New(jwt.GetSigningMethod("RS256"))
 
+	rc := jwt.RegisteredClaims{
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		NotBefore: jwt.NewNumericDate(time.Now()),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
+	}
+	if setting.OIDC.Issuer != "" {
+		rc.Issuer = setting.OIDC.Issuer
+	}
+	// Set the issuer to the OIDC issuer URL
 	t.Claims = &OIDCClaims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			NotBefore: jwt.NewNumericDate(time.Now()),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
-		},
+		RegisteredClaims:  rc,
 		Subject:           fmt.Sprintf("repo:%s/%s", repo.OwnerName, repo.Name),
 		Repository:        repo.Name,
 		RepositoryOwner:   repo.OwnerName,
