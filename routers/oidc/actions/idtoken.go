@@ -38,6 +38,7 @@ type OIDCClaims struct {
 	EventName         string `json:"event_name"`
 	ActorID           int64  `json:"actor_id"`
 	Actor             string `json:"actor"`
+	Ref               string `json:"ref"`
 }
 
 type JWKSKey struct {
@@ -144,7 +145,8 @@ func createToken(ctx *context.OIDCContext) (string, error) {
 		RunID:             job.RunID,
 		ActorID:           run.TriggerUserID,
 		Actor:             triggerUser.Name,
-		//EventName:         run.E,
+		Ref:               run.Ref,
+		EventName:         run.TriggerEvent,
 	}
 
 	// Create token string
